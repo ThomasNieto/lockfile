@@ -1,26 +1,20 @@
 using namespace System.IO
+using namespace System.Management.Automation.Runspaces
 
 function Get-LockFile {
     [CmdletBinding()]
     param (
         [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName)]
         [string]
-        $Path,
-
-        [ValidateSet('Csv', 'Json')]
-        [string]
-        $Format
+        $Path
     )
 
-    end {
-        if (!$PSBoundParameters.ContainsKey('Format')) {
-            $Format = [Path]::GetExtension($Path) -replace '\.', ''
-        }
-        
-        switch ($Format) {
-            'Csv' { Import-Csv -Path $Path }
-            'Json' { Get-Content -Path $Path | ConvertFrom-Json }
-            default { throw 'Invalid file extension' }
+    process {
+        try {
+            Get-Content -Path $Path | ConvertFrom-Json
+        } catch {
+            Write-Error $_
         }
     }
 }
@@ -29,68 +23,74 @@ function Set-LockFile {
     [CmdletBinding()]
     param (
         [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName)]
         [string]
-        $Path,
-
-        [ValidateSet('Csv', 'Json')]
-        [string]
-        $Format
+        $Path
     )
     
-    end {
-        if (!$PSBoundParameters.ContainsKey('Format')) {
-            $Format = [Path]::GetExtension($Path) -replace '\.', ''
-        }
-        
+    process {
         $config = @{ ComputerName = [Environment]::MachineName
-                     PID          = $PID
-                     ProcessName  = (Get-Process -Id $PID).ProcessName 
+            ProcessID             = $PID
+            ProcessName           = (Get-Process -Id $PID).ProcessName 
         }
         
-        switch ($Format) {
-            'Csv' { $config | Export-Csv -Path $Path }
-            'Json' { $config | ConvertTo-Json | Out-File -FilePath $Path }
-            default { throw 'Invalid file extension' }
-        }
+        $config | ConvertTo-Json | Out-File -FilePath $Path 
     }
 }
 
 function Test-LockFile {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
     param (
         [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory, ParameterSetName = 'Path', Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName)]
         [string]
         $Path,
 
-        [ValidateSet('Csv', 'Json')]
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory, ParameterSetName = 'Value', ValueFromPipelineByPropertyName)]
         [string]
-        $Format
+        $ComputerName,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory, ParameterSetName = 'Value', ValueFromPipelineByPropertyName)]
+        [Alias('PID')]
+        [int]
+        $ProcessID,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory, ParameterSetName = 'Value', ValueFromPipelineByPropertyName)]
+        [string]
+        $ProcessName,
+
+        [ValidateNotNull()]
+        [PSSession]
+        $Session
     )
 
-    end {
-        if (!$PSBoundParameters.ContainsKey('Format')) {
-            $Format = [Path]::GetExtension($Path) -replace '\.', ''
-        }
-        
-        $config = switch ($Format) {
-            'Csv' { Import-Csv -Path $Path }
-            'Json' { Get-Content -Path $Path | ConvertFrom-Json }
-            default { throw 'Invalid file extension' }
+    process {
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            try {
+                $config = Get-Content -Path $Path -ErrorAction Stop | ConvertFrom-Json
+            } catch {
+                Write-Error $_
+            }
+            
+            $ComputerName = $config.ComputerName
+            $ProcessID = $config.ProcessID
+            $ProcessName = $config.ProcessName
         }
 
-        if ([Environment]::MachineName -eq $config.ComputerName) {
-            if ((Get-Process -Id $config.PID -ErrorAction SilentlyContinue).ProcessName -eq $config.ProcessName) {
-                $true
-            } else {
-                $false
-            }
-        } else {
-            # TODO: Flex for WinRM and SSH as -ComputerName parameter doesn't exist on PS7
-            if ((Get-Process -ComputerName $config.ComputerName -Id $config.PID -ErrorAction SilentlyContinue).ProcessName -eq $config.ProcessName) {
-                $true
-            } else {
-                $false
-            }
+        if ([Environment]::MachineName -ne $ComputerName -and !$PSBoundParameters.ContainsKey("Session")) {
+            Write-Error "Lock file computer name '$ComputerName' does not match current computer '$([Environment]::MachineName)' and session not passed."
+            return
         }
+        elseif ([Environment]::MachineName -ne $ComputerName) {
+            $process = Invoke-Command -Session $Session -ScriptBlock { Get-Process -Id $using:ProcessID -ErrorAction SilentlyContinue }
+        }
+        else {
+            $process = Get-Process -Id $ProcessID -ErrorAction SilentlyContinue
+        }
+        
+        $process.ProcessName -eq $ProcessName
     }
 }
