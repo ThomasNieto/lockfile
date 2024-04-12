@@ -29,9 +29,10 @@ function Set-LockFile {
     )
     
     process {
-        $config = @{ ComputerName = [Environment]::MachineName
-            ProcessID             = $PID
-            ProcessName           = (Get-Process -Id $PID).ProcessName 
+        $config = @{
+            ComputerName = [Environment]::MachineName
+            ProcessID    = $PID
+            ProcessName  = (Get-Process -Id $PID).ProcessName 
         }
         
         $config | ConvertTo-Json | Out-File -FilePath $Path 
@@ -80,14 +81,12 @@ function Test-LockFile {
             $ProcessName = $config.ProcessName
         }
 
-        if ([Environment]::MachineName -ne $ComputerName -and !$PSBoundParameters.ContainsKey("Session")) {
+        if ([Environment]::MachineName -ne $ComputerName -and !$PSBoundParameters.ContainsKey('Session')) {
             Write-Error "Lock file computer name '$ComputerName' does not match current computer '$([Environment]::MachineName)' and session not passed."
             return
-        }
-        elseif ([Environment]::MachineName -ne $ComputerName) {
+        } elseif ([Environment]::MachineName -ne $ComputerName) {
             $process = Invoke-Command -Session $Session -ScriptBlock { Get-Process -Id $using:ProcessID -ErrorAction SilentlyContinue }
-        }
-        else {
+        } else {
             $process = Get-Process -Id $ProcessID -ErrorAction SilentlyContinue
         }
         
