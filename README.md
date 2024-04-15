@@ -55,7 +55,7 @@ create a session to the computer for the cmdlet to check the validity.
 $lock = Get-LockFile -Path \\scripts\myscript.lock
 
 $results = if ($env:ComputerName -ne $lock.ComputerName) {
-    $session = New-PSSession -ComputerName TestDC2
+    $session = New-PSSession -ComputerName $lock.ComputerName
     $lock | Test-LockFile -Session $session
 } else {
     $lock | Test-LockFile
