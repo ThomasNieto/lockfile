@@ -58,7 +58,7 @@ $results = if ($env:ComputerName -ne $lock.ComputerName) {
     $session = New-PSSession -ComputerName TestDC2
     $lock | Test-LockFile -Session $session
 } else {
-    $lock | Test-LockFile -Session
+    $lock | Test-LockFile
 }
 
 $results
