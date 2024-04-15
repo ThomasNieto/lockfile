@@ -155,6 +155,7 @@ function Test-LockFile {
                     ConvertFrom-Json
             } catch {
                 Write-Error $_
+                return
             }
         }
 
