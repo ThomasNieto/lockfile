@@ -40,6 +40,7 @@ function Get-LockFile {
                 ConvertFrom-Json
         } catch {
             Write-Error $_
+            return
         }
 
         $config
@@ -93,6 +94,7 @@ function Set-LockFile {
                 Out-File -FilePath $Path
         } catch {
             Write-Error $_
+            return
         }
 
         if ($PassThru) {
