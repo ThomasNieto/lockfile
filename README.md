@@ -38,13 +38,13 @@ TestDC            4800 pwsh
 ### Test Lock File Validity
 
 ```powershell
-Test-FileLock -Path \\scripts\myscript.lock
+Test-LockFile -Path \\scripts\myscript.lock
 ```
 
 You can also pipe the outputs from `Get-LockFile`.
 
 ```powershell
-Get-LockFile -Path \\scripts\myscript.lock | Test-FileLock
+Get-LockFile -Path \\scripts\myscript.lock | Test-LockFile
 True
 ```
 
